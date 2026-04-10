@@ -1,0 +1,15 @@
+=== AAVISHKAR FACULTY PORTAL - VERCEL KEYS ===
+
+To make the faculty portal work on Vercel, you must add these
+environment variables in the Vercel Dashboard (Settings > Environment Variables).
+
+1. VITE_API_URL
+   Value: [Your Live Backend URL]/api
+   (Example: https://aavishkar-admin.vercel.app/api)
+
+2. VITE_SOCKET_URL
+   Value: [Your Live Backend URL]
+   (Example: https://aavishkar-admin.vercel.app)
+
+Note: Ensure your backend (Admin side) is deployed before 
+setting these keys.
