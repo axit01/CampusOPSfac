@@ -37,21 +37,39 @@ const Timetable = () => {
   }, []);
 
   // Helper to find assigned lecture for a specific day and slot
-  const getLectureForSlot = (day, slot) => {
-    // In a real system, the schedule object would be complex. 
-    // For this demonstration, we'll look for any mention of the faculty name in the schedule slots
+  const getLectureForSlot = (day, slotTime, slotIdx) => {
     let assignment = null;
     
     timetableData.forEach(tt => {
-      if (tt.schedule && tt.schedule[day] && tt.schedule[day][slot]) {
-        const lecture = tt.schedule[day][slot];
-        // Check if user is associated with this lecture
-        if (lecture.instructor === user.name || lecture.instructorId === user.id) {
-          assignment = {
-            ...lecture,
-            className: tt.className,
-            department: tt.department
-          };
+      if (tt.schedule && tt.schedule[day]) {
+        const daySchedule = tt.schedule[day];
+        // If it's an array, we can use the slot index
+        if (Array.isArray(daySchedule)) {
+          const lecture = daySchedule[slotIdx];
+          if (lecture && !lecture.isEmpty) {
+            // Match by faculty name or user ID
+            // Admin saves it as 'faculty', Faculty side looks for 'instructor'
+            if (lecture.faculty === user.name || lecture.instructor === user.name || 
+                lecture.instructorId === user.id || lecture.facultyId === user.id) {
+              assignment = {
+                ...lecture,
+                className: tt.className,
+                department: tt.department
+              };
+            }
+          }
+        } 
+        // Legacy support if it's an object keyed by time
+        else if (daySchedule[slotTime]) {
+          const lecture = daySchedule[slotTime];
+          if (lecture.instructor === user.name || lecture.faculty === user.name || 
+              lecture.instructorId === user.id || lecture.facultyId === user.id) {
+            assignment = {
+              ...lecture,
+              className: tt.className,
+              department: tt.department
+            };
+          }
         }
       }
     });
@@ -71,10 +89,10 @@ const Timetable = () => {
       doc.text(`Academic Timetable - ${user.dept}`, 14, 15);
       
       const tableColumn = ["Time", ...days];
-      const tableRows = slots.map(slot => {
+      const tableRows = slots.map((slot, idx) => {
         const row = [slot];
-        days.forEach(day => {
-          const lec = getLectureForSlot(day, slot);
+        days.forEach((day, dIdx) => {
+          const lec = getLectureForSlot(day, slot, idx);
           row.push(lec ? `${lec.subject}\n(${lec.className})` : "-");
         });
         return row;
@@ -141,7 +159,7 @@ const Timetable = () => {
                   {slot}
                 </td>
                 {days.map((day, dIdx) => {
-                  const lecture = getLectureForSlot(day, slot);
+                  const lecture = getLectureForSlot(day, slot, sIdx);
                   return (
                     <td key={day} style={{ padding: '12px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)' }}>
                       {lecture ? (

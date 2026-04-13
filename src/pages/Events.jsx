@@ -26,10 +26,21 @@ const Events = () => {
       try {
         const res = await axios.get(`${API_BASE_URL}/events`);
         // Filter for this faculty
-        const myItems = res.data.filter(item => 
-          (item.faculty === 'System' || (item.faculty && item.faculty.includes(user.name)))
-          && item.type !== 'Task' // Only show Meetings and Events here
-        );
+        const myItems = res.data.filter(item => {
+          const normalizedUserName = user.name?.toLowerCase().trim();
+          const itemFaculty = item.faculty?.toLowerCase() || '';
+          const isSystem = itemFaculty.includes('system');
+          
+          let isAssigned = false;
+          if (normalizedUserName && itemFaculty) {
+            const assigneeWords = itemFaculty.split(' ').filter(w => w.length > 2);
+            const userWords = normalizedUserName.split(' ').filter(w => w.length > 2);
+            isAssigned = assigneeWords.some(word => normalizedUserName.includes(word)) || 
+                         userWords.some(word => itemFaculty.includes(word));
+          }
+          
+          return (isSystem || isAssigned) && item.type !== 'Task';
+        });
         setItems(myItems);
       } catch (error) {
         console.error('Events Fetch Error:', error);

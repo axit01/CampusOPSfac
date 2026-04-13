@@ -38,24 +38,43 @@ export const AuthProvider = ({ children }) => {
         
         res.data.forEach(tt => {
           if (tt.schedule && tt.schedule[today]) {
-            Object.entries(tt.schedule[today]).forEach(([slot, lecture]) => {
-              if (lecture.instructor === user.name || lecture.instructorId === user.id) {
-                // Parse slot "09:00 AM"
-                const [time, period] = slot.split(' ');
-                let [hours, minutes] = time.split(':').map(Number);
-                if (period === 'PM' && hours !== 12) hours += 12;
-                if (period === 'AM' && hours === 12) hours = 0;
+            const daySchedule = tt.schedule[today];
+            
+            // Handle both Array (new) and Object (legacy) formats
+            const entries = Array.isArray(daySchedule)
+              ? daySchedule.map((lec, idx) => [lec?.timeStart || `${9+idx}:00`, lec])
+              : Object.entries(daySchedule);
+
+            entries.forEach(([timeStr, lecture]) => {
+              if (!lecture || lecture.isEmpty) return;
+
+              const isAssigned = lecture.faculty === user.name || lecture.instructor === user.name || 
+                                lecture.instructorId === user.id || lecture.facultyId === user.id;
+
+              if (isAssigned) {
+                let hours, minutes;
+                
+                // Handle "09:00 AM" format
+                if (timeStr.includes(' ')) {
+                  const [time, period] = timeStr.split(' ');
+                  [hours, minutes] = time.split(':').map(Number);
+                  if (period === 'PM' && hours !== 12) hours += 12;
+                  if (period === 'AM' && hours === 12) hours = 0;
+                } 
+                // Handle "09:00" (24h) format
+                else {
+                  [hours, minutes] = timeStr.split(':').map(Number);
+                }
                 
                 const lecTime = new Date();
                 lecTime.setHours(hours, minutes, 0, 0);
                 
                 const diff = (lecTime.getTime() - now.getTime()) / (1000 * 60);
                 
-                // Alert if starting in 8.5 to 11 minutes (to catch it in the 2-min interval)
-                if (diff > 8.5 && diff <= 11) {
+                if (diff > 8.5 && diff <= 12) {
                   notificationService.send("Lecture Reminder", {
                     body: `Your lecture "${lecture.subject}" starts in 10 minutes in Room ${lecture.room || 'TBA'}.`,
-                    tag: `lec-${slot}-${today}`
+                    tag: `lec-${timeStr}-${today}`
                   });
                 }
               }

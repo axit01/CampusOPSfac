@@ -50,7 +50,7 @@ const Notepad = () => {
       color: '#f8fafc'
     };
     try {
-      const res = await axios.post(`${API_URL}/notes`, newNote);
+      const res = await axios.post(`${API_BASE_URL}/notes`, newNote);
       setNotes([res.data, ...notes]);
       setActiveNote(res.data);
     } catch (error) {
@@ -60,7 +60,7 @@ const Notepad = () => {
 
   const updateNote = async (id, updates) => {
     try {
-      const res = await axios.patch(`${API_URL}/notes/${id}`, updates);
+      const res = await axios.patch(`${API_BASE_URL}/notes/${id}`, updates);
       setNotes(notes.map(n => n.id === id ? res.data : n));
       setActiveNote(res.data);
     } catch (error) {
@@ -70,7 +70,7 @@ const Notepad = () => {
 
   const deleteNote = async (id) => {
     try {
-      await axios.delete(`${API_URL}/notes/${id}`);
+      await axios.delete(`${API_BASE_URL}/notes/${id}`);
       const updatedNotes = notes.filter(n => n.id !== id);
       setNotes(updatedNotes);
       if (activeNote?.id === id) {

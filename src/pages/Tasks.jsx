@@ -46,9 +46,27 @@ const Tasks = () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/tasks`);
       // Filter tasks assigned to this faculty
-      const myTasks = res.data.filter(t => 
-        t.assignedTo.includes(user.name) || t.assignedTo.includes(user.id)
-      );
+      const myTasks = res.data.filter(t => {
+        if (!t.assignedTo || !Array.isArray(t.assignedTo)) return false;
+        
+        const normalizedUserName = user.name?.toLowerCase().trim();
+        const normalizedUserId = user.id?.toString();
+        
+        return t.assignedTo.some(assignee => {
+          const lowerAssignee = assignee?.toLowerCase().trim();
+          if (!lowerAssignee || !normalizedUserName) return false;
+          
+          // Direct match or ID match
+          if (lowerAssignee === normalizedUserName || assignee === normalizedUserId) return true;
+          
+          // Word overlap check (handles middle names or shorter versions)
+          const assigneeWords = lowerAssignee.split(' ').filter(w => w.length > 2);
+          const userWords = normalizedUserName.split(' ').filter(w => w.length > 2);
+          
+          return assigneeWords.every(word => normalizedUserName.includes(word)) || 
+                 userWords.every(word => lowerAssignee.includes(word));
+        });
+      });
       setTasks(myTasks);
     } catch (error) {
       console.error('Fetch Tasks Error:', error);
@@ -174,10 +192,14 @@ const Tasks = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginBottom: '24px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Clock size={14} />
+                  <span>Started {new Date(task.createdAt).toLocaleDateString()}</span>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Calendar size={14} />
-                  <span>Ends {task.deadline || 'No deadline'}</span>
+                  <span>{task.deadline?.includes('-') ? `Due ${new Date(task.deadline).toLocaleDateString()}` : `Due: ${task.deadline || 'No deadline'}`}</span>
                 </div>
               </div>
 

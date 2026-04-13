@@ -96,7 +96,7 @@ const Collaboration = () => {
     }
   };
 
-  const updateTaskStatus = async (taskId, newStatus) => {
+  const handleTaskAction = async (taskId, newStatus) => {
     try {
       await axios.patch(`${API_BASE_URL}/tasks/${taskId}`, { status: newStatus });
       // Update the message metadata in-place to reflect the new status
@@ -271,7 +271,7 @@ const MessageBubble = ({ msg, isMe, onTaskAction }) => {
             </p>
             {m.deadline && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                <Calendar size={13} /> <span>Deadline: {m.deadline}</span>
+                <Calendar size={13} /> <span>{m.deadline?.includes('-') ? `Due ${new Date(m.deadline).toLocaleDateString()}` : `Due: ${m.deadline || 'No deadline'}`}</span>
               </div>
             )}
             <div style={{ display: 'flex', gap: '10px' }}>

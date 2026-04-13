@@ -35,14 +35,37 @@ const Dashboard = () => {
         axios.get(`${API_BASE_URL}/notifications`)
       ]);
 
-      const myTasks = tasksRes.data.filter(t => 
-        t.assignedTo.includes(user.name) || t.assignedTo.includes(user.id)
-      );
+      const normalizedUserName = user.name?.toLowerCase().trim();
+      const normalizedUserId = user.id?.toString();
+
+      const myTasks = tasksRes.data.filter(t => {
+        if (!t.assignedTo || !Array.isArray(t.assignedTo)) return false;
+        return t.assignedTo.some(assignee => {
+          const lowerAssignee = assignee?.toLowerCase().trim();
+          if (!lowerAssignee || !normalizedUserName) return false;
+          if (lowerAssignee === normalizedUserName || assignee === normalizedUserId) return true;
+          
+          const assigneeWords = lowerAssignee.split(' ').filter(w => w.length > 2);
+          const userWords = normalizedUserName.split(' ').filter(w => w.length > 2);
+          
+          return assigneeWords.every(word => normalizedUserName.includes(word)) || 
+                 userWords.every(word => lowerAssignee.includes(word));
+        });
+      });
       
-      const myEvents = eventsRes.data.filter(e => 
-        (e.faculty === 'System' || (e.faculty && e.faculty.includes(user.name)))
-        && e.type !== 'Task'
-      );
+      const myEvents = eventsRes.data.filter(e => {
+        const itemFaculty = e.faculty?.toLowerCase() || '';
+        const isSystem = itemFaculty.includes('system');
+        
+        let isAssigned = false;
+        if (normalizedUserName && itemFaculty) {
+          const assigneeWords = itemFaculty.split(' ').filter(w => w.length > 2);
+          const userWords = normalizedUserName.split(' ').filter(w => w.length > 2);
+          isAssigned = assigneeWords.some(word => normalizedUserName.includes(word)) || 
+                       userWords.some(word => itemFaculty.includes(word));
+        }
+        return (isSystem || isAssigned) && e.type !== 'Task';
+      });
 
       setStats({
         assignedTasks: myTasks.length,
