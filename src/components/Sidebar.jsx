@@ -21,12 +21,11 @@ const Sidebar = () => {
 
   const menuItems = [
     { icon: Home, label: 'Dashboard', path: '/' },
-    { icon: CheckSquare, label: 'Task Management', path: '/tasks' },
     { icon: MessageSquare, label: 'Collaboration', path: '/collaboration' },
     { icon: Calendar, label: 'Calendar', path: '/calendar' },
     { icon: Clock, label: 'Timetable', path: '/timetable' },
     { icon: StickyNote, label: 'Notepad', path: '/notepad' },
-    { icon: Users, label: 'Events & Meetings', path: '/events' },
+    { icon: Users, label: 'Schedule & Tasks', path: '/events' },
   ];
 
   return (

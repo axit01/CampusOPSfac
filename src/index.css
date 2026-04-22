@@ -508,3 +508,80 @@ h1, h2, h3, h4, h5, h6 {
     background: white !important;
   }
 }
+/* Kanban Board Styles */
+.tasks-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  align-items: start;
+  padding-bottom: 40px;
+}
+
+.tasks-column {
+  background: rgba(241, 245, 249, 0.5);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 600px;
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.tasks-column:hover {
+  background: rgba(241, 245, 249, 0.8);
+  border-color: var(--accent-soft);
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 12px;
+  border-bottom: 2px solid rgba(0,0,0,0.03);
+}
+
+.column-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.column-count {
+  background: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .tasks-board {
+    gap: 20px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .tasks-board {
+    grid-template-columns: 1fr;
+  }
+  
+  .tasks-column {
+    min-height: auto;
+  }
+}
+

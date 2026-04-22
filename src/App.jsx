@@ -32,13 +32,6 @@ function App() {
             </ProtectedRoute>
           } />
 
-          <Route path="/tasks" element={
-            <ProtectedRoute>
-              <Layout>
-                <Tasks />
-              </Layout>
-            </ProtectedRoute>
-          } />
 
           <Route path="/collaboration" element={
             <ProtectedRoute>

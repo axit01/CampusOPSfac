@@ -238,7 +238,7 @@ const Dashboard = () => {
         <aside>
           <h2 className="heading-section">Quick Actions</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <ActionBtn icon={<CheckCircle size={18} />} label="Manage Tasks" color="var(--accent)" onClick={() => navigate('/tasks')} />
+            <ActionBtn icon={<CheckCircle size={18} />} label="Manage Tasks" color="var(--accent)" onClick={() => navigate('/events')} />
             <ActionBtn icon={<Users size={18} />} label="Join Meeting" color="var(--success)" onClick={() => navigate('/events')} />
             <ActionBtn icon={<Calendar size={18} />} label="View Calendar" color="var(--secondary)" onClick={() => navigate('/calendar')} />
           </div>

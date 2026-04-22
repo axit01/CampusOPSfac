@@ -32,11 +32,113 @@ const PhaseStep = ({ active, label }) => (
 
 import { API_BASE_URL } from '../config';
 
+const getPriorityColor = (priority) => {
+  switch (priority) {
+    case 'High': return '#ef4444';
+    case 'Medium': return '#f59e0b';
+    case 'Low': return '#10b981';
+    default: return '#3b82f6';
+  }
+};
+
+const getStatusBadge = (status) => {
+  switch (status) {
+    case 'Completed': return <span className="badge badge-success">Completed</span>;
+    case 'Working': return <span className="badge badge-info">Working</span>;
+    case 'Accepted': return <span className="badge badge-warning">Accepted</span>;
+    default: return <span className="badge" style={{ background: '#f1f5f9', color: '#64748b' }}>Assigned</span>;
+  }
+};
+
+const TaskCard = ({ task, updateTaskStatus }) => (
+  <motion.div 
+    layout
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, scale: 0.95 }}
+    className="premium-card"
+    style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      background: 'white', 
+      borderLeft: `4px solid ${getPriorityColor(task.priority)}`,
+      padding: '16px',
+      gap: '12px',
+      cursor: 'default'
+    }}
+  >
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span style={{ fontSize: '0.65rem', fontWeight: '800', color: 'var(--text-muted)' }}>{task.priority?.toUpperCase()}</span>
+      {getStatusBadge(task.status)}
+    </div>
+
+    <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-primary)' }}>{task.title}</h3>
+    
+    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4', margin: 0 }}>
+      {task.description || 'No description provided.'}
+    </p>
+
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <Clock size={12} />
+        <span>{new Date(task.createdAt).toLocaleDateString()}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <Calendar size={12} />
+        <span>{task.deadline?.includes('-') ? new Date(task.deadline).toLocaleDateString() : (task.deadline || 'No deadline')}</span>
+      </div>
+    </div>
+
+    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+      {!task.status || task.status === 'Assigned' ? (
+        <>
+          <button 
+            onClick={() => updateTaskStatus(task.id, 'Accepted')}
+            className="btn btn-primary" 
+            style={{ flex: 1, height: '32px', padding: '0 8px', fontSize: '0.75rem', background: 'var(--success)', border: 'none' }}
+          >
+            Accept
+          </button>
+          <button 
+            onClick={() => updateTaskStatus(task.id, 'Rejected')}
+            className="btn btn-outline" 
+            style={{ flex: 1, height: '32px', padding: '0 8px', fontSize: '0.75rem', color: 'var(--danger)', borderColor: 'var(--danger-soft)' }}
+          >
+            Reject
+          </button>
+        </>
+      ) : task.status === 'Accepted' ? (
+        <button 
+          onClick={() => updateTaskStatus(task.id, 'Working')}
+          className="btn btn-accent" 
+          style={{ width: '100%', height: '32px', padding: '0 8px', fontSize: '0.75rem' }}
+        >
+          <Play size={14} /> Start Working
+        </button>
+      ) : task.status === 'Working' ? (
+        <button 
+          onClick={() => updateTaskStatus(task.id, 'Completed')}
+          className="btn btn-primary" 
+          style={{ width: '100%', height: '32px', padding: '0 8px', fontSize: '0.75rem', background: 'var(--success)' }}
+        >
+          <CheckCircle size={14} /> Complete
+        </button>
+      ) : (
+        <div style={{ width: '100%', textAlign: 'center', fontSize: '0.75rem', color: 'var(--success)', fontWeight: '600', padding: '6px', background: 'var(--success-soft)', borderRadius: 'var(--radius-sm)' }}>
+          <CheckCircle size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Completed
+        </div>
+      )}
+    </div>
+  </motion.div>
+);
+
+
 const Tasks = () => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('All');
+
+
 
   useEffect(() => {
     fetchTasks();
@@ -44,36 +146,87 @@ const Tasks = () => {
 
   const fetchTasks = async () => {
     try {
+      setLoading(true);
       const res = await axios.get(`${API_BASE_URL}/tasks`);
-      // Filter tasks assigned to this faculty
-      const myTasks = res.data.filter(t => {
-        if (!t.assignedTo || !Array.isArray(t.assignedTo)) return false;
+      
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      // 1. Normalize user identification
+      const myName = (user.name || '').toLowerCase().trim();
+      const myId = (user.id || user._id || '').toString().toLowerCase();
+      const nameWords = myName.split(' ').filter(w => w.length > 1);
+
+      console.log('Task Pull Engine - Identity:', { name: myName, id: myId });
+
+      // 2. High-performance filtering
+      let myTasks = res.data.filter(t => {
+        const assignees = Array.isArray(t.assignedTo) ? t.assignedTo : 
+                         (t.assignedTo ? [t.assignedTo.toString()] : []);
         
-        const normalizedUserName = user.name?.toLowerCase().trim();
-        const normalizedUserId = user.id?.toString();
-        
-        return t.assignedTo.some(assignee => {
-          const lowerAssignee = assignee?.toLowerCase().trim();
-          if (!lowerAssignee || !normalizedUserName) return false;
+        // Match by any identifier
+        return assignees.some(assignee => {
+          const val = assignee.toString().toLowerCase().trim();
+          if (myId && val === myId) return true;
+          if (myName && (val === myName || val.includes(myName) || myName.includes(val))) return true;
           
-          // Direct match or ID match
-          if (lowerAssignee === normalizedUserName || assignee === normalizedUserId) return true;
-          
-          // Word overlap check (handles middle names or shorter versions)
-          const assigneeWords = lowerAssignee.split(' ').filter(w => w.length > 2);
-          const userWords = normalizedUserName.split(' ').filter(w => w.length > 2);
-          
-          return assigneeWords.every(word => normalizedUserName.includes(word)) || 
-                 userWords.every(word => lowerAssignee.includes(word));
+          // Word-level match
+          const valWords = val.split(' ').filter(w => w.length > 1);
+          return nameWords.some(w => valWords.includes(w)) || valWords.some(w => nameWords.includes(w));
         });
       });
-      setTasks(myTasks);
+
+      // 3. Safety Net: If still nothing, check if any task was sent via Message metadata
+      // (This handles cases where tasks are in the DB but the assignment field is named differently)
+      if (myTasks.length === 0) {
+        try {
+          const msgRes = await axios.get(`${API_BASE_URL}/messages?targetId=${user.id || user._id}`);
+          const tasksFromMsgs = msgRes.data
+            .filter(m => m.type === 'task-card' && m.metadata?.taskId)
+            .map(m => ({
+              id: m.metadata.taskId,
+              _id: m.metadata.taskId,
+              title: m.metadata.title,
+              description: m.metadata.description,
+              priority: m.metadata.priority,
+              deadline: m.metadata.deadline,
+              status: m.metadata.status || 'Assigned',
+              createdAt: m.timestamp
+            }));
+          
+          // Merge with any tasks that might have been partially matched
+          const existingIds = new Set(myTasks.map(t => (t.id || t._id).toString()));
+          tasksFromMsgs.forEach(t => {
+            if (!existingIds.has(t.id.toString())) {
+              myTasks.push(t);
+            }
+          });
+        } catch (msgErr) {
+          console.warn('Fallback message-task sync failed', msgErr);
+        }
+      }
+
+      // 4. Final ID normalization for the UI components
+      const normalizedTasks = myTasks.map(t => ({
+        ...t,
+        id: t.id || t._id // Ensure 'id' exists for the TaskCard components
+      }));
+
+      console.log('Task Pull Engine - Final Count:', normalizedTasks.length);
+      setTasks(normalizedTasks);
     } catch (error) {
-      console.error('Fetch Tasks Error:', error);
+      console.error('Task Pull Engine - Error:', error);
     } finally {
       setLoading(false);
     }
   };
+
+
+
+
+
 
   const updateTaskStatus = async (taskId, newStatus) => {
     try {
@@ -85,36 +238,8 @@ const Tasks = () => {
     }
   };
 
-  const filteredTasks = filter === 'All' ? tasks : tasks.filter(t => t.status === filter);
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Completed': return <span className="badge badge-success">Completed</span>;
-      case 'Working': return <span className="badge badge-info">Working</span>;
-      case 'Accepted': return <span className="badge badge-warning">Accepted</span>;
-      default: return <span className="badge" style={{ background: '#f1f5f9', color: '#64748b' }}>Assigned</span>;
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'High': return '#ef4444';
-      case 'Medium': return '#f59e0b';
-      case 'Low': return '#10b981';
-      default: return '#3b82f6';
-    }
-  };
-
-  const getProgressLabel = (status) => {
-    switch (status) {
-      case 'Completed': return '100%';
-      case 'Working': return '60%';
-      case 'Accepted': return '20%';
-      default: return '0%';
-    }
-  };
-
   if (loading) return (
+
     <div className="tasks-page">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px' }}>
         <div>
@@ -137,120 +262,67 @@ const Tasks = () => {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px' }}>
         <div>
           <h1 className="heading-hero">Task Management</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Track and manage your institutional workflow.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Track and manage your institutional workflow in real-time.</p>
         </div>
-        
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ position: 'relative' }}>
-            <Filter size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <select 
-              className="input" 
-              style={{ width: '180px', paddingLeft: '36px', height: '40px', fontSize: '0.875rem' }}
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            >
-              <option value="All">All Tasks</option>
-              <option value="Assigned">Assigned</option>
-              <option value="Accepted">Accepted</option>
-              <option value="Working">Working</option>
-              <option value="Completed">Completed</option>
-            </select>
-          </div>
-        </div>
+
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '24px' }}>
-        <AnimatePresence>
-          {filteredTasks.map((task) => (
-            <motion.div 
-              key={task.id}
-              layout
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="premium-card"
-              style={{ display: 'flex', flexDirection: 'column', minHeight: '400px', background: 'white', borderTop: `4px solid ${getPriorityColor(task.priority)}` }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)' }}>{task.priority?.toUpperCase()} PRIORITY</span>
-                {getStatusBadge(task.status)}
-              </div>
+      <div className="tasks-board">
+        {/* Assigned Column */}
+        <div className="tasks-column">
+          <div className="column-header">
+            <div className="column-title">
+              <Clock size={18} color="var(--warning)" />
+              <span>Assigned</span>
+            </div>
+            <span className="column-count">{tasks.filter(t => !t.status || t.status === 'Assigned' || t.status === 'Accepted').length}</span>
+          </div>
+          <div className="tasks-list">
+            <AnimatePresence>
+              {tasks.filter(t => !t.status || t.status === 'Assigned' || t.status === 'Accepted').map((task) => (
+                <TaskCard key={task.id} task={task} updateTaskStatus={updateTaskStatus} />
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
 
-              <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '12px', color: 'var(--text-primary)' }}>{task.title}</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '24px', flex: 1, lineHeight: '1.6' }}>
-                {task.description || 'No detailed description provided by administration.'}
-              </p>
+        {/* Working Column */}
+        <div className="tasks-column">
+          <div className="column-header">
+            <div className="column-title">
+              <Play size={18} color="var(--accent)" />
+              <span>Working</span>
+            </div>
+            <span className="column-count">{tasks.filter(t => t.status === 'Working').length}</span>
+          </div>
+          <div className="tasks-list">
+            <AnimatePresence>
+              {tasks.filter(t => t.status === 'Working').map((task) => (
+                <TaskCard key={task.id} task={task} updateTaskStatus={updateTaskStatus} />
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <p style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' }}>Current Phase</p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: '10px', left: '10px', right: '10px', height: '2px', background: 'var(--border)', zIndex: 0 }}></div>
-                  <PhaseStep active={true} label="Assign" />
-                  <PhaseStep active={['Accepted', 'Working', 'Completed'].includes(task.status)} label="Accept" />
-                  <PhaseStep active={['Working', 'Completed'].includes(task.status)} label="Work" />
-                  <PhaseStep active={task.status === 'Completed'} label="Done" />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginBottom: '24px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Clock size={14} />
-                  <span>Started {new Date(task.createdAt).toLocaleDateString()}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Calendar size={14} />
-                  <span>{task.deadline?.includes('-') ? `Due ${new Date(task.deadline).toLocaleDateString()}` : `Due: ${task.deadline || 'No deadline'}`}</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
-                {!task.status || task.status === 'Assigned' ? (
-                  <>
-                    <button 
-                      onClick={() => updateTaskStatus(task.id, 'Accepted')}
-                      className="btn btn-primary" 
-                      style={{ flex: 1, height: '42px', fontSize: '0.85rem', background: 'var(--success)', border: 'none' }}
-                    >
-                      <CheckCircle size={18} /> Accept Task
-                    </button>
-                    <button 
-                      onClick={() => updateTaskStatus(task.id, 'Rejected')}
-                      className="btn btn-outline" 
-                      style={{ flex: 1, height: '42px', fontSize: '0.85rem', color: 'var(--danger)', borderColor: 'var(--danger-soft)' }}
-                    >
-                      <XCircle size={18} /> Reject
-                    </button>
-                  </>
-                ) : task.status === 'Accepted' ? (
-                  <button 
-                    onClick={() => updateTaskStatus(task.id, 'Working')}
-                    className="btn btn-accent" 
-                    style={{ width: '100%', height: '42px', fontSize: '0.85rem' }}
-                  >
-                    <Play size={18} /> Start Working
-                  </button>
-                ) : task.status === 'Working' ? (
-                  <button 
-                    onClick={() => updateTaskStatus(task.id, 'Completed')}
-                    className="btn btn-primary" 
-                    style={{ width: '100%', height: '42px', fontSize: '0.85rem', background: 'var(--success)' }}
-                  >
-                    <CheckCircle size={18} /> Mark Completed
-                  </button>
-                ) : (
-                  <button 
-                    className="btn btn-outline" 
-                    disabled 
-                    style={{ width: '100%', height: '42px', fontSize: '0.85rem', opacity: 0.7, background: 'var(--bg-main)' }}
-                  >
-                    <CheckCircle size={18} /> Task Finalized
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {/* Completed Column */}
+        <div className="tasks-column">
+          <div className="column-header">
+            <div className="column-title">
+              <CheckCircle size={18} color="var(--success)" />
+              <span>Completed</span>
+            </div>
+            <span className="column-count">{tasks.filter(t => t.status === 'Completed').length}</span>
+          </div>
+          <div className="tasks-list">
+            <AnimatePresence>
+              {tasks.filter(t => t.status === 'Completed').map((task) => (
+                <TaskCard key={task.id} task={task} updateTaskStatus={updateTaskStatus} />
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
+
 
       {tasks.length === 0 && (
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
